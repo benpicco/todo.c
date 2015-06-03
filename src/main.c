@@ -297,26 +297,42 @@ td_task_print(task_t *task, size_t idx)
 hbuf_t *
 td_try_txt()
 {
+    char cwd[1024];
     const char *htxt = "~/todo.txt";
-    const char *ctxt = "./todo.txt";
+    const char *ctxt = "todo.txt";
 
     hbuf_t *buf = hbuf_new(BUF_UNIT);
+    char* path = getcwd(cwd, sizeof(cwd));
 
-    if (buf == NULL) {
+    if (buf == NULL || path == NULL) {
         td_emsg(TD_ENOMEM);
         td_exit(TD_ENOMEM);
     }
 
-    if (file_exists(ctxt)) {
-        if (hbuf_puts(buf, (char *)ctxt) != HBUF_OK) {
-            td_emsg(TD_ENOMEM);
-            hbuf_free(buf);
-            td_exit(TD_ENOMEM);
+    int file_found = 0;
+    char* end;
+    while (end = strrchr(path, '/')) {
+        strncat(path, "/", sizeof(cwd));
+        strncat(path, ctxt, sizeof(cwd));
+
+        if (file_exists(path)) {
+            if (hbuf_puts(buf, path) != HBUF_OK) {
+                td_emsg(TD_ENOMEM);
+                hbuf_free(buf);
+                td_exit(TD_ENOMEM);
+            }
+
+            file_found = 1;
+            break;
         }
-    } else {
+
+        *end = '\0';
+    }
+
+    if (!file_found) {
         wordexp_t exp_r;
         wordexp(htxt, &exp_r, 0);
-        char *path = exp_r.we_wordv[0];
+        path = exp_r.we_wordv[0];
 
         if (!file_exists(path) && !file_touch(path)) {
             td_emsg(TD_EIOW, path);
